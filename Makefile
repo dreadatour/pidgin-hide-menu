@@ -14,16 +14,16 @@ GLIB_CFLAGS =                   \
 all:	release
 
 install:
-	cp hidemenu.so /usr/lib/pidgin/
+	install -m 0755 hidemenu.so /usr/local/lib/pidgin/
 
 uninstall:
-	rm -f /usr/lib/pidgin/hidemenu.so
+	rm -f /usr/local/lib/pidgin/hidemenu.so
 
 clean:
 	rm -f hidemenu.so
 
 hidemenu.so:	hidemenu.c
-	${LINUX32_COMPILER} ${LIBPURPLE_CFLAGS} -Wall -pthread ${GLIB_CFLAGS} -I. -g -O2 -pipe hidemenu.c -o hidemenu.so -shared -fPIC -DPIC
+	${LINUX32_COMPILER} ${LIBPURPLE_CFLAGS} -Wall -pthread ${GLIB_CFLAGS} -I. -g3 -O2 -pipe hidemenu.c -o hidemenu.so -shared -fPIC -DPIC
 
 release:	hidemenu.so
 

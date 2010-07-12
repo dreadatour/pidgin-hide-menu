@@ -39,13 +39,13 @@
 #include <gdk/gdkwindow.h>
 
 // current menu visibility state
-gboolean is_menu_visible = TRUE;
+gboolean hmb_is_menu_visible = TRUE;
 
 /**************************************************************************************************
     Toggle menubars visibility
 **************************************************************************************************/
 static void
-toggle_menubar(PidginBuddyList *gtkblist, PidginConversation *gtkconv)
+hmb_toggle_menubar(PidginBuddyList *gtkblist, PidginConversation *gtkconv)
 {
     GtkWidget *menu = NULL;
 
@@ -54,7 +54,7 @@ toggle_menubar(PidginBuddyList *gtkblist, PidginConversation *gtkconv)
         menu = gtk_item_factory_get_widget(gtkblist->ift, "<PurpleMain>");
     }
 
-    if (is_menu_visible) {
+    if (hmb_is_menu_visible) {
         // show all elements
         if (gtkblist != NULL && purple_prefs_get_bool("/plugins/core/hidemenu/menu_blist") && !gtk_widget_get_visible(menu)) {
             gtk_widget_show(menu);
@@ -82,32 +82,33 @@ toggle_menubar(PidginBuddyList *gtkblist, PidginConversation *gtkconv)
 /**************************************************************************************************
     Toggle menubars state
 **************************************************************************************************/
-static void toggle_menubar_state()
+static void 
+hmb_toggle_menubar_state()
 {
     PidginBuddyList *gtkblist = pidgin_blist_get_default_gtk_blist();
 	GList *convs = purple_get_conversations();
    
     // toggle menu visibility status
-    is_menu_visible = !is_menu_visible;
+    hmb_is_menu_visible = !hmb_is_menu_visible;
     
     // toggle blist
-    toggle_menubar(gtkblist, NULL);
+    hmb_toggle_menubar(gtkblist, NULL);
 	
     // toggle conversations
     while (convs) {
 		PurpleConversation *conv = (PurpleConversation *)convs->data;
 		if (PIDGIN_IS_PIDGIN_CONVERSATION(conv)) {
-			toggle_menubar(NULL, PIDGIN_CONVERSATION(conv));
+			hmb_toggle_menubar(NULL, PIDGIN_CONVERSATION(conv));
 		}
 		convs = convs->next;
 	}
 }
 
 /**************************************************************************************************
-    Key was pressed
+    Key was pressed in buddy list window
 **************************************************************************************************/
 static GdkFilterReturn 
-key_press(GdkXEvent *EventData, GdkEvent *Event, gpointer Data) 
+hmb_key_press_blist(GdkXEvent *EventData, GdkEvent *Event, gpointer Data) 
 {
     // make sure this is a key event
     if(((XEvent*)EventData)->type != KeyPress) {
@@ -119,7 +120,30 @@ key_press(GdkXEvent *EventData, GdkEvent *Event, gpointer Data)
 
     // if key 'F12' pressed - toggle menus
     if (KeyEvent->keycode == 96) {
-        toggle_menubar_state();
+        hmb_toggle_menubar_state();
+        return GDK_FILTER_REMOVE;
+    }  
+
+    return GDK_FILTER_CONTINUE;
+}
+
+/**************************************************************************************************
+    Key was pressed in conversation window
+**************************************************************************************************/
+static GdkFilterReturn 
+hmb_key_press_conv(GdkXEvent *EventData, GdkEvent *Event, gpointer Data) 
+{
+    // make sure this is a key event
+    if(((XEvent*)EventData)->type != KeyPress) {
+        return GDK_FILTER_CONTINUE;
+    }
+
+    // extract the key modifiers
+    XKeyEvent *KeyEvent=(XKeyEvent*)EventData;
+
+    // if key 'F12' pressed - toggle menus
+    if (KeyEvent->keycode == 96) {
+        hmb_toggle_menubar_state();
         return GDK_FILTER_REMOVE;
     }  
 
@@ -130,38 +154,38 @@ key_press(GdkXEvent *EventData, GdkEvent *Event, gpointer Data)
     Buddy list was created
 **************************************************************************************************/
 static void 
-blist_created_cb(PurpleBuddyList *blist)
+hmb_blist_created_cb(PurpleBuddyList *blist)
 {
     PidginBuddyList *gtkblist = PIDGIN_BLIST(blist);
     GdkWindow *root = gtk_widget_get_toplevel(GTK_WIDGET(gtkblist->window))->window;
 
     // set keygrabber if needed
     if (g_object_get_data((GObject *) root, "filter_set") == NULL) {
-        gdk_window_add_filter(root, key_press, 0);
+        gdk_window_add_filter(root, hmb_key_press_blist, 0);
         g_object_set_data((GObject *) root, "filter_set", "1");
     }
 	
     // hide menubar
-    toggle_menubar(gtkblist, NULL);
+    hmb_toggle_menubar(gtkblist, NULL);
 }
 
 /**************************************************************************************************
     Conversation was displayed
 **************************************************************************************************/
 static void
-conversation_displayed_cb(PidginConversation *gtkconv)
+hmb_conversation_displayed_cb(PidginConversation *gtkconv)
 {
     PidginBuddyList *gtkblist = pidgin_blist_get_default_gtk_blist();
     GdkWindow *root = gtk_widget_get_toplevel(GTK_WIDGET(gtkconv->win->window))->window;
     
     // set keygrabber if needed
     if (g_object_get_data((GObject *) root, "filter_set") == NULL) {
-        gdk_window_add_filter(root, key_press, 0);
+        gdk_window_add_filter(root, hmb_key_press_conv, 0);
         g_object_set_data((GObject *) root, "filter_set", "1");
     }
 
     // hide menubar
-	toggle_menubar(gtkblist, gtkconv);
+	hmb_toggle_menubar(gtkblist, gtkconv);
 }
 
 /**************************************************************************************************
@@ -174,26 +198,26 @@ plugin_load(PurplePlugin *plugin)
 	GList *convs = purple_get_conversations();
 
     if (purple_prefs_get_bool("/plugins/core/hidemenu/default_state")) {
-        is_menu_visible = FALSE;
+        hmb_is_menu_visible = FALSE;
     } else {
-        is_menu_visible = TRUE;
+        hmb_is_menu_visible = TRUE;
     }
 
     // set callback for 'blist created' signal
     purple_signal_connect(pidgin_blist_get_handle(), "gtkblist-created", plugin, 
-                          PURPLE_CALLBACK(blist_created_cb), NULL);
+                          PURPLE_CALLBACK(hmb_blist_created_cb), NULL);
     // set callback for 'conversation displayed' signal
 	purple_signal_connect(pidgin_conversations_get_handle(), "conversation-displayed", plugin,
-	                      PURPLE_CALLBACK(conversation_displayed_cb), NULL);
+	                      PURPLE_CALLBACK(hmb_conversation_displayed_cb), NULL);
 
 	// hide blist menubar
-    toggle_menubar(gtkblist, NULL);
+    hmb_toggle_menubar(gtkblist, NULL);
 
     // hide conversations menubar
 	while (convs) {
 		PurpleConversation *conv = (PurpleConversation *)convs->data;
 		if (PIDGIN_IS_PIDGIN_CONVERSATION(conv)) {
-			toggle_menubar(NULL, PIDGIN_CONVERSATION(conv));
+			hmb_toggle_menubar(NULL, PIDGIN_CONVERSATION(conv));
 		}
 		convs = convs->next;
 	}
@@ -201,6 +225,9 @@ plugin_load(PurplePlugin *plugin)
 	return TRUE;
 }
 
+/**************************************************************************************************
+    Preferences window
+**************************************************************************************************/
 static PurplePluginPrefFrame *
 get_plugin_pref_frame(PurplePlugin *plugin) {
     PurplePluginPrefFrame *frame;
@@ -282,11 +309,11 @@ init_plugin(PurplePlugin *plugin)
 {
     purple_prefs_add_none("/plugins/core/hidemenu");
     purple_prefs_add_bool("/plugins/core/hidemenu/default_state", TRUE);
-    purple_prefs_add_bool("/plugins/core/hidemenu/menu_blist", TRUE);
-    purple_prefs_add_bool("/plugins/core/hidemenu/status_blist", TRUE);
-    purple_prefs_add_bool("/plugins/core/hidemenu/menu_conv", TRUE);
+    purple_prefs_add_bool("/plugins/core/hidemenu/menu_blist",    TRUE);
+    purple_prefs_add_bool("/plugins/core/hidemenu/status_blist",  TRUE);
+    purple_prefs_add_bool("/plugins/core/hidemenu/menu_conv",     TRUE);
 }
 
 //  and now we will go and initialize our plugin
-PURPLE_INIT_PLUGIN(hidemenu, init_plugin, info)
+PURPLE_INIT_PLUGIN(hidemenu, init_plugin, info);
 
